@@ -1,27 +1,54 @@
-project_root=/home/szotica/azotic/nika/
-dir="$( cd "$( dirname "$0" )" && pwd )"
-docker_name="nika"
+#!/usr/bin/env bash
+set -euo pipefail
 
-for lib in "$@"
-do 
-    if [ ! -d "$project_root/$lib" ]; then
-        echo "$project_root/$lib was not found."
-        exit
-    fi
-done
+image_name="${NIKA_IMAGE_NAME:-nika:latest}"
+container_name="${NIKA_CONTAINER_NAME:-nika}"
+git_transport="${GIT_TRANSPORT:-https}"
+github_org="${GITHUB_ORG:-NikaOptimizer}"
+git_ref="${GIT_REF:-main}"
+repos="${NIKA_REPOS:-no-logging no-calculator fisher data-manager strategist backend frontend}"
+start_backend="${NIKA_START_BACKEND:-1}"
+start_frontend="${NIKA_START_FRONTEND:-1}"
+backend_port="${NIKA_BACKEND_PORT:-8000}"
+frontend_port="${NIKA_FRONTEND_PORT:-5173}"
 
-docker build -t $docker_name .
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+cd "${script_dir}"
 
-docker run --name $docker_name -h $docker_name --network host\
- -v $project_root:/home/nika/libs \
- -ti -d nika:latest
+build_args=(
+    --build-arg "GIT_TRANSPORT=${git_transport}"
+    --build-arg "GITHUB_ORG=${github_org}"
+    --build-arg "GIT_REF=${git_ref}"
+    --build-arg "NIKA_REPOS=${repos}"
+    -t "${image_name}"
+)
 
-# wait for container to start
-sleep 3 
+if [ "${git_transport}" = 'ssh' ]; then
+    export DOCKER_BUILDKIT=1
+    build_args=(--ssh default "${build_args[@]}")
+fi
 
-# install git and git libs in editable mode
-docker exec -it $docker_name bash -c "cd /home/nika/libs && echo $@ | xargs -n 1 python3 -m pip install -e"
+echo "Building ${image_name} from GitHub repos: ${repos}"
+docker build "${build_args[@]}" .
 
+if docker ps -a --format '{{.Names}}' | grep -qx "${container_name}"; then
+    echo "Removing existing container ${container_name}"
+    docker rm -f "${container_name}" >/dev/null
+fi
 
-docker stop $docker_name
-docker start $docker_name
+echo "Starting ${container_name}"
+docker run \
+    --name "${container_name}" \
+    --hostname "${container_name}" \
+    -e "NIKA_START_BACKEND=${start_backend}" \
+    -e "NIKA_START_FRONTEND=${start_frontend}" \
+    -e "NIKA_BACKEND_PORT=${backend_port}" \
+    -e "NIKA_FRONTEND_PORT=${frontend_port}" \
+    --network host \
+    -it -d "${image_name}"
+
+echo "Container ${container_name} is ready."
+echo "Frontend: http://127.0.0.1:${frontend_port}"
+echo "Backend:  http://127.0.0.1:${backend_port}"
+echo "Logs: docker exec ${container_name} ls -l /home/nika/logs"
+echo "Open a shell with: docker exec -it ${container_name} bash"

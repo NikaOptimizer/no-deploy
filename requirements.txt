@@ -1,4 +1,5 @@
-pandas
-pandas-ta
+# Python/runtime requirements installed before Nika repositories.
+# Repository-specific dependencies are installed by pip from each cloned repo.
 setuptools
+wheel
 packaging
