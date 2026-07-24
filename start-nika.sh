@@ -37,21 +37,25 @@ start_backend() {
 
 start_frontend() {
     local frontend_dir="${NIKA_SRC_DIR}/frontend"
-    local client_dir="${frontend_dir}/client"
+    local app_dir="${frontend_dir}"
 
     if [ "${NIKA_START_FRONTEND}" != '1' ]; then
         echo 'Frontend startup disabled by NIKA_START_FRONTEND.'
         return 0
     fi
 
-    if [ ! -f "${client_dir}/package.json" ]; then
-        echo "Frontend client not found at ${client_dir}; skipping frontend startup."
-        return 0
+    if [ ! -f "${app_dir}/package.json" ]; then
+        if [ -f "${frontend_dir}/client/package.json" ]; then
+            app_dir="${frontend_dir}/client"
+        else
+            echo "Frontend app not found at ${frontend_dir}; skipping frontend startup."
+            return 0
+        fi
     fi
 
     echo "Starting Vite frontend on ${NIKA_FRONTEND_HOST}:${NIKA_FRONTEND_PORT}"
     (
-        cd "${client_dir}"
+        cd "${app_dir}"
         bun run dev --host "${NIKA_FRONTEND_HOST}" --port "${NIKA_FRONTEND_PORT}"
     ) >"${NIKA_LOG_DIR}/frontend.log" 2>&1 &
     pids+=("$!")

@@ -50,9 +50,11 @@ for repo in ${NIKA_REPOS}; do
         echo "==> ${repo} has no pyproject.toml or setup.py; cloned but not pip-installable yet"
     fi
 
-    if [ "${repo}" = 'frontend' ] && [ -f "${target}/client/package.json" ]; then
+    if [ "${repo}" = 'frontend' ] && [ -f "${target}/package.json" ]; then
         echo '==> Installing frontend dependencies'
         (cd "${target}" && bun install)
+    elif [ "${repo}" = 'frontend' ] && [ -f "${target}/client/package.json" ]; then
+        echo '==> Installing legacy frontend/client dependencies'
         (cd "${target}/client" && bun install)
     fi
 
